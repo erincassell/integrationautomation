@@ -1,69 +1,96 @@
 function schoolSetup() {
-  var sa, ss, lastCol, lastRow, headers, i, header;
-  var phaseCol, folderCol, schools, helper, phase, folder;
-  var columns = [4], schoolfolder, templatefolder;
-  var integrationfolders, integrationfolder, message;
   
   //Default values
-  sa = SpreadsheetApp.getActive();
-  ss = sa.getSheetByName("Full List of Integrations");
-  lastCol = ss.getLastColumn();
-  lastRow = ss.getLastRow();
-  headers = ss.getRange(1, 1, 1, lastCol).getValues();
-  integrationfolders = DriveApp.getFoldersByName("*In Process Integrations");
-  if(integrationfolders.hasNext()) {
-    integrationfolder = integrationfolders.next();
-  }
+  var sa = SpreadsheetApp.getActive();
+  var ss = sa.getSheetByName("Full List of Integrations");
+  var sc = sa.getSheetByName("College Contacts");
+  var integrations = ss.getDataRange().getValues();
+  var contacts = sc.getDataRange().getValues();
+  var headers = integrations[0];
+  var headerValues = new Object();
+  
+  var integrationfolders = DriveApp.getFoldersByName("*In Process Integrations");
+  var integrationfolder = integrationfolders.next();
   
   //Find the column number for the Implemenation Phase and Folder columns
-  i = 0;
-  while(i < lastCol) {
-    header = headers[0][i].trim();
+  var i = 0;
+  while(i < headers.length) {
+    header = headers[i].trim();
     switch(header) {
       case "School":
-        columns.push(i);
+        headerValues['school'] = i;
         break;
       case "CRM/SIS":
-        columns.push(i);
+        headerValues['CRM'] = i;
         break;
-      case "Overall Implementation Status":
-        columns.push(i);
+      case "Integration Status":
+        headerValues['status'] = i;
+        break;
+      case "Integration Manager":
+        headerValues['im'] = i;
+        break;
+      case "Integration Specialist":
+        headerValues['is'] = i;
         break;
       case "Folder":
-        columns.push(i);
+        headerValues['folder'] = i;
+        break;
+      case "Scheduling Link":
+        headerValues['link'] = i;
+        break;
+      case "Primary Email":
+        headerValues['primary'] = i;
+        break;
+      case "Secondary Email":
+        headerValues['secondary'] = i;
+        break;
+      case "Assignees":
+        headerValues['assignees'] = i;
         break;
     }
     i++;
   }
-  columns.reverse();
-  columns.pop();
-  columns.reverse();
   
-  //Get all of the data in the sheet
-  schools = ss.getRange(2, 1, lastRow, lastCol).getValues();
+  i = 0;
+  while(i < integrations.length) {
+    if(integrations[i][0].trim() == "") {
+      var holder = integrations.splice(i);
+    }
+    i++;
+  }
 
   try {
     //Loop through and find those that need a folder
-    i = 0;
-    while(i < schools.length) {
-      phase = schools[i][columns[2]].trim();
-      folder = schools[i][columns[3]].trim();
-      if(phase == 'Signed Contract' && folder == "") {
-        ss.getRange(i+2, columns[3]+2).setFormulaR1C1("=CONCATENATE(IFERROR(VLOOKUP(R[0]C[-26], Inputs!R2C7:R20C9, 3, FALSE), \"\"), \" and \", IFERROR(VLOOKUP(R[0]C[-25], Inputs!R2C7:R20C9, 3, FALSE)))");
-        ss.getRange(i+2, columns[3]+3).setFormulaR1C1("=IF(TRIM(R[0]C[-1])=\"and\", \"\", IF(RIGHT(TRIM(R[0]C[-1]),3)=\"and\", LEFT(R[0]C[-1], LEN(R[0]C[-1])-5), R[0]C[-1]))");
-        ss.getRange(i+2, columns[3]+4).setFormulaR1C1("=IFERROR(VLOOKUP(R[0]C[-28], Inputs!R2C7:R20C9, 2, FALSE), \"\")");
-        ss.getRange(i+2, columns[3]+5).setFormulaR1C1("=IFERROR(VLOOKUP(R[0]C[-28], Inputs!R2C7:R20C9, 2, FALSE), \"\")");
-        ss.activate();
-        schoolfolder = createFolder(schools, i, columns[0], columns[1]);
-        templatefolder = getMappingDoc(schoolfolder, schools, i, columns[0], columns[1]);
-        getS2SDoc(schoolfolder, templatefolder, schools, i, columns[0], columns[1]);
-        getKickoff(schoolfolder, templatefolder, schools, i, columns[0], columns[1]);
+    i = integrations.length-1;
+
+    while(i > 0) {
+      var statusCol = integrations[i][Number(headerValues['status']).valueOf()];
+      var folderCol = integrations[i][Number(headerValues['folder']).valueOf()];
+      if(statusCol == 'Signed Contract' && folderCol == "") {
+        var school = integrations[i].slice(0);
+        var schoolContacts = [];
+        var j = 0;
+        while(j < contacts.length) {
+          if(contacts[j][1] == school[headerValues['school']]) {
+            schoolContacts.push(contacts[j]);
+          }
+          j++;
+        }
+        var schoolfolder = createFolder(school, headerValues);
+        var templatefolder = getMappingDoc(school, schoolfolder, headerValues, schoolContacts);
+        createWelcome(school, schoolfolder, templatefolder, headerValues, schoolContacts);
+        copyFile(school, schoolfolder, MimeType.GOOGLE_DOCS, "Sales to Services Handoff", templatefolder, headerValues);
+        copyFile(school, schoolfolder, MimeType.GOOGLE_SHEETS, "Sample Data", templatefolder, headerValues);
+        getKickoff(school, schoolfolder, templatefolder, headerValues);
         moveFolder(schoolfolder, integrationfolder);
-        //copyFormulas(i, columns[3]);
-        sendSetupEmail(schools, i, columns[0], columns[1], columns[3]);
-        ss.getRange(i+2, columns[3]+1).setValue("X");
+        sendSetupEmail(school, headerValues);
+        ss.getRange(i+1, headerValues['folder']+1).setValue("X");
+      } else {
+        if(school[headerValues['folder']] == "X") {
+          i = 0;
+        }
       }
-      i++;
+      i--;
     }
   } catch(e) {
     
@@ -74,21 +101,18 @@ function schoolSetup() {
   }
 }
 
-function createFolder(schools, row, schoolCol, crmCol) {
-  var foldername, newschools, helper, i;
-  var newFolder, insidefolders, insidefolder;
-  
+function createFolder(school, headerValues) {  
   //Name of the folders that need to go inside
-  insidefolders = ["0 Communication and Meetings", "1 Pre Integration", "2 Integration and Testing", "3 Go Live", "4 Support"];
+  var insidefolders = ["0 Communication and Meetings", "1 Pre Integration", "2 Integration and Testing", "3 Go Live", "4 Support"];
   
   //Create main folder
-  foldername = schools[row][schoolCol] + " (" + schools[row][crmCol] + ")";
-  newFolder = DriveApp.createFolder(foldername);
+  var foldername = school[headerValues['school']] + " (" + school[headerValues['CRM']] + ")";
+  var newFolder = DriveApp.createFolder(foldername);
   
   //Add in the child folders
   i = 0;
   while(i < insidefolders.length) {
-    insidefolder = DriveApp.createFolder(insidefolders[i]);
+    var insidefolder = DriveApp.createFolder(insidefolders[i]);
     newFolder.addFolder(insidefolder);
     DriveApp.removeFolder(insidefolder);
     i++;
@@ -96,79 +120,89 @@ function createFolder(schools, row, schoolCol, crmCol) {
   return newFolder;
 }
 
-function getMappingDoc(newFolder, schools, row, schoolCol, crmCol) {
-  var mappings, mapping, mappingname, mappingtemplate, searchvalue;
-  var templatecopy, templatecopyname, helper;
-  var templatefolders, templatefolder, parents, parent, template;
-                       
+function getMappingDoc(school, newFolder, headerValues, contacts) {                       
   //Get Templates folder
-  templatefolders = DriveApp.getFoldersByName("Templates");
-  while(templatefolders.hasNext()){
-    templatefolder = templatefolders.next();
-  }
-  
-  helper = templatefolder.getName();
+  var templatefolders = DriveApp.getFoldersByName("Templates");
+  var templatefolder = templatefolders.next();
   
   //Locate the correct template
-  mappings = templatefolder.getFilesByType(MimeType.GOOGLE_SHEETS);
-  //mappings = templatefolder.getFiles();
+  var mappings = templatefolder.getFilesByType(MimeType.GOOGLE_SHEETS);
+  
   while(mappings.hasNext()) {
-    mapping = mappings.next();
-    searchvalue = schools[row][crmCol] + " ";
-    mappingname = mapping.getName();
-    if(mappingname.search(searchvalue) == 0) { //Only want it if it starts with the word
-      mappingtemplate = mapping;
+    var mapping = mappings.next();
+    var helper = mapping.getName();
+    var searchvalue = school[headerValues['CRM']] + " ";
+    if(mapping.getName().search(searchvalue) == 0) { //Only want it if it starts with the word
+      var mappingtemplate = mapping;
     }
   }
   
-  //Change the name of the mapping document
-  templatecopy = mappingtemplate.makeCopy(newFolder);
-  templatecopyname = templatecopy.getName();
-  templatecopyname = templatecopyname.slice(8, templatecopyname.length); 
-  templatecopy.setName(schools[row][schoolCol] + " " + templatecopyname);
-  
+  //Make a copy of the template to the school folder with the correct name
+  var templatecopy = mappingtemplate.makeCopy(school[headerValues['school']] + " " + mappingtemplate.getName(), newFolder);
+  var ss = SpreadsheetApp.open(templatecopy);
+  var contactSheet = ss.insertSheet("Contacts", 1);
+  contactSheet.getRange(1, 1, contacts.length, contacts[0].length).setValues(contacts);
+  contactSheet.deleteColumns(1, 2);
   return templatefolder;
 }
 
-function getS2SDoc(newFolder, templatefolder, schools, row, schoolCol, crmCol) {
-  var documents, document, documentname, handoff, handoffcopy, handoffcopyname;
+function createWelcome(school, schoolfolder, templatefolder, headerValues, contacts) {
+  var documents = templatefolder.getFilesByName("Welcome Message");
+  var document = documents.next();
   
-  //Locate the S2S document in the Templates folder
-  documents = templatefolder.getFilesByType(MimeType.GOOGLE_DOCS);
-  while(documents.hasNext()) {
-    document = documents.next();
-    documentname = document.getName();
-    if(documentname == "Sales to Services Handoff") {
-      handoff = document;
+  //Find the contact information
+  var i = 0;
+  while(i < contacts.length) {
+    if(contacts[i][1] == school[headerValues['school'].valueOf()] && contacts[i][5] == "X") {
+      var first = contacts[i][6];
+      var email = contacts[i][9];
+    }
+    i++;
+  }
+  
+  var welcomeFile = document.makeCopy(school[headerValues['school']] + " " + document.getName(), schoolfolder);
+  var welcome = DocumentApp.openById(welcomeFile.getId());
+  
+  var welcomeBody = welcome.getBody();
+  welcomeBody.replaceText("<<Institution>>", school[headerValues['school']]);
+  welcomeBody.replaceText("<<CRM>>", school[headerValues['CRM']]);
+  welcomeBody.replaceText("<<First>>", first);
+  welcomeBody.replaceText("<<POC>>", email);
+  welcomeBody.replaceText("<<Primary>>", school[headerValues['im']]);
+  welcomeBody.replaceText("<<Backup>>", school[headerValues['is']]);
+  welcomeBody.replaceText("<<link>>", school[headerValues['link']]);
+  welcome.saveAndClose();
+  
+  }
+
+function copyFile(school, newFolder, fileType, fileName, templateFolder, headerValues) {
+  var files = templateFolder.getFilesByType(fileType);
+  while(files.hasNext()) {
+    var file = files.next();
+    if(file.getName() == fileName) {
+      var foundFile = file;
+      var helper = foundFile.getName();
     }
   }
   
-  //Change the name of the mapping document
-  handoffcopy = handoff.makeCopy(newFolder);
-  handoffcopyname = handoffcopy.getName();
-  handoffcopyname = handoffcopyname.slice(8, handoffcopyname.length); 
-  handoffcopy.setName(schools[row][schoolCol] + " " + handoffcopyname);
+  var fileCopy = foundFile.makeCopy(school[headerValues['school']] + " " + foundFile.getName(), newFolder);  
 }
 
-function getKickoff(newFolder, templatefolder, schools, row, schoolCol, crmCol) {
-  var documents, document, documentname, handoff, handoffcopy, handoffcopyname, searchvalue;
+function getKickoff(school, newFolder, templatefolder, headerValues) {
   
   //Locate the S2S document in the Templates folder
-  documents = templatefolder.getFilesByType(MimeType.GOOGLE_SLIDES);
+  var documents = templatefolder.getFilesByType(MimeType.GOOGLE_SLIDES);
   while(documents.hasNext()) {
-    document = documents.next();
-    searchvalue = schools[row][crmCol];
-    documentname = document.getName();
-    if(documentname.search(searchvalue)==0) {
+    var document = documents.next();
+    var searchvalue = school[headerValues['CRM']];
+
+    if(document.getName().search(searchvalue)==0) {
       handoff = document;
     }
   }
   
   //Change the name of the mapping document
-  handoffcopy = handoff.makeCopy(newFolder);
-  handoffcopyname = handoffcopy.getName();
-  handoffcopyname = handoffcopyname.slice(8, handoffcopyname.length); 
-  handoffcopy.setName(schools[row][schoolCol] + " " + handoffcopyname);
+  var copy = handoff.makeCopy(school[headerValues['school']], newFolder);
 }
 
 function moveFolder(schoolfolder, integrationfolder) {
@@ -176,29 +210,15 @@ function moveFolder(schoolfolder, integrationfolder) {
   DriveApp.removeFolder(schoolfolder);
 }
 
-function copyFormulas(row, folderCol) {
-  var sa, ss, helper;
-  var copyRng, toRng;
-  
-  sa = SpreadsheetApp.getActiveSpreadsheet();
-  ss = sa.getActiveSheet();
-  helper = ss.getName();
-  
-  copyRng = ss.getRange(row+1, folderCol+2, 1, 4).getFormulasR1C1();
-
-  //toRng = ss.getRange(row+2, folderCol+2, 1, 4).setValues(copyRng);
-  //ss.getRange(row+2, folderCol+2, 1, 4).activate();
-}
-
-function sendSetupEmail(schools, row, schoolCol, crmCol, folderCol){
+function sendSetupEmail(school, headerValues){
   var email, cc, assignees, institution, crm, columns;
-  columns = schools[0].length;
+  columns = school.length;
   
-  email = schools[row][folderCol+3];
-  cc = schools[row][folderCol+4];
-  assignees = schools[row][folderCol+2];
-  institution = schools[row][schoolCol];
-  crm = schools[row][crmCol];
+  email = school[headerValues['primary']];
+  cc = school[headerValues['secondary']];
+  assignees = school[headerValues['assignees']];
+  institution = school[headerValues['school']];
+  crm = school[headerValues['CRM']];
   
   var subject = "New Integration: " + institution + " (" + crm + ")";
   
