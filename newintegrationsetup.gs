@@ -82,6 +82,10 @@ function schoolSetup() {
         copyFile(school, schoolfolder, MimeType.GOOGLE_DOCS, "Sales to Services Handoff", templatefolder, headerValues);
         copyFile(school, schoolfolder, MimeType.GOOGLE_SHEETS, "Sample Data", templatefolder, headerValues);
         getKickoff(school, schoolfolder, templatefolder, headerValues);
+        copyFile(school, schoolfolder, MimeType.GOOGLE_DOCS, "Credential Information", templatefolder, headerValues);
+        copyFile(school, schoolfolder, MimeType.GOOGLE_SHEETS, "Integration Checklists", templatefolder, headerValues);
+        copyFile(school, schoolfolder, MimeType.GOOGLE_SHEETS, "Live Monitoring", templatefolder, headerValues);
+        moveAgreement(school, schoolfolder, headerValues);
         moveFolder(schoolfolder, integrationfolder);
         sendSetupEmail(school, headerValues);
         ss.getRange(i+1, headerValues['folder']+1).setValue("X");
@@ -140,9 +144,12 @@ function getMappingDoc(school, newFolder, headerValues, contacts) {
   //Make a copy of the template to the school folder with the correct name
   var templatecopy = mappingtemplate.makeCopy(school[headerValues['school']] + " " + mappingtemplate.getName(), newFolder);
   var ss = SpreadsheetApp.open(templatecopy);
-  var contactSheet = ss.insertSheet("Contacts", 1);
-  contactSheet.getRange(1, 1, contacts.length, contacts[0].length).setValues(contacts);
-  contactSheet.deleteColumns(1, 2);
+  
+  if(contacts.length != 0) {
+    var contactSheet = ss.insertSheet("Contacts", 1);
+    contactSheet.getRange(1, 1, contacts.length, contacts[0].length).setValues(contacts);
+    contactSheet.deleteColumns(1, 2);
+  }
   return templatefolder;
 }
 
@@ -197,13 +204,33 @@ function getKickoff(school, newFolder, templatefolder, headerValues) {
     var searchvalue = school[headerValues['CRM']];
 
     if(document.getName().search(searchvalue)==0) {
-      handoff = document;
+      var handoff = document;
     }
   }
   
   //Change the name of the mapping document
-  var copy = handoff.makeCopy(school[headerValues['school']], newFolder);
+  var copy = handoff.makeCopy(school[headerValues['school']] + " " + handoff.getName(), newFolder);
 }
+
+function moveAgreement(school, schoolfolder, headerValues) {
+  var folders = DriveApp.getFoldersByName("Executed Contracts");
+  var folder = folders.next();
+  var searchvalue = school[headerValues['school']];
+  
+  var files = folder.getFilesByType(MimeType.PDF);
+  while(files.hasNext()) {
+    var file = files.next();
+    var test = file.getName();
+    var helper = 0;
+    
+    if(file.getName().search(searchvalue)==0){
+      var agreement = file;
+      agreement.makeCopy(school[headerValues['school']] + " " + agreement.getName(), schoolfolder);
+      folder.removeFile(agreement);
+    }
+  }
+}
+
 
 function moveFolder(schoolfolder, integrationfolder) {
   integrationfolder.addFolder(schoolfolder);
