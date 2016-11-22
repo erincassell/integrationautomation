@@ -85,6 +85,7 @@ function schoolSetup() {
         copyFile(school, schoolfolder, MimeType.GOOGLE_DOCS, "Credential Information", templatefolder, headerValues);
         copyFile(school, schoolfolder, MimeType.GOOGLE_SHEETS, "Integration Checklists", templatefolder, headerValues);
         copyFile(school, schoolfolder, MimeType.GOOGLE_SHEETS, "Live Monitoring", templatefolder, headerValues);
+        createSupport(school, schoolfolder, templatefolder, headerValues, schoolContacts);
         moveAgreement(school, schoolfolder, headerValues);
         moveFolder(schoolfolder, integrationfolder);
         sendSetupEmail(school, headerValues);
@@ -179,8 +180,7 @@ function createWelcome(school, schoolfolder, templatefolder, headerValues, conta
   welcomeBody.replaceText("<<Backup>>", school[headerValues['is']]);
   welcomeBody.replaceText("<<link>>", school[headerValues['link']]);
   welcome.saveAndClose();
-  
-  }
+}
 
 function copyFile(school, newFolder, fileType, fileName, templateFolder, headerValues) {
   var files = templateFolder.getFilesByType(fileType);
@@ -231,6 +231,19 @@ function moveAgreement(school, schoolfolder, headerValues) {
   }
 }
 
+function createSupport(school, schoolfolder, templatefolder, headerValues, contacts) {
+  var documents = templatefolder.getFilesByName("Move to Support Email");
+  var document = documents.next();
+  
+  var supportFile = document.makeCopy(school[headerValues['school']] + " " + document.getName(), schoolfolder);
+  var support = DocumentApp.openById(supportFile.getId());
+  
+  var supportBody = support.getBody();
+  supportBody.replaceText("<<Institution>>", school[headerValues['school']]);
+  supportBody.replaceText("<<CRM>>", school[headerValues['CRM']]);
+  supportBody.replaceText("<<Integration Manager>>", school[headerValues['im']]);
+  support.saveAndClose();
+}
 
 function moveFolder(schoolfolder, integrationfolder) {
   integrationfolder.addFolder(schoolfolder);
