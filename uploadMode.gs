@@ -2,7 +2,7 @@ function onOpen() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var csvMenuEntries = [{name: "Compare Data", functionName: "compareSheets"}, 
                         {name: "Upload Mode Report", functionName: "uploadMode"},
-                        {name: "Upload SFTP File", functionName: "uploadSFTP"}];
+                        {name: "Upload CRM File", functionName: "uploadSFTP"}];
   ss.addMenu("Live Monitoring", csvMenuEntries);
 }
 
@@ -49,7 +49,7 @@ function uploadMode() {
   }
   
   try {
-    var newSheet = sa.insertSheet("CSV - Day " + sheetDay.toString());
+    var newSheet = sa.insertSheet("FR - Day " + sheetDay.toString());
     newSheet.getRange(1, 1, data.length, data[0].length).setValues(data);
     newSheet.activate();
   } catch(err) {

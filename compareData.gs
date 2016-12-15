@@ -8,7 +8,7 @@ function compareSheets() {
   while(i < sheets.length) {
     var sheetName = sheets[i].getSheetName();
     var value = sheetName.substring(0,4);
-    if(sheetName.substring(0,4) == "SFTP") {
+    if(sheetName.substring(0,4) == "CRM ") {
       var newday = parseInt(sheetName.substr(sheetName.length-1, 1));
       if(newday > day) {
         day = newday;
@@ -19,9 +19,9 @@ function compareSheets() {
   
   //Get the sheets that will be used
   var previous = day - 1;
-  var SFTP1 = sa.getSheetByName("SFTP - Day " + previous.toString());
-  var SFTP2 = sa.getSheetByName("SFTP - Day " + day.toString());
-  var CSV = sa.getSheetByName("CSV - Day " + day.toString());
+  var SFTP1 = sa.getSheetByName("CRM - Day " + previous.toString());
+  var SFTP2 = sa.getSheetByName("CRM - Day " + day.toString());
+  var CSV = sa.getSheetByName("FR - Day " + day.toString());
   var inputs = sa.getSheetByName("Instructions");
   
   //Get the data from the sheets and the number of columns

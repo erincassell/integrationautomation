@@ -9,7 +9,7 @@ function uploadSFTP() {
   var sheetNum = 200;
   while(n < sheets.length) {
     var curSheet = sheets[n].getName();
-    if(curSheet.search("SFTP") == 0) {
+    if(curSheet.search("CRM") == 0) {
       sheetNum = n;
       //break;
     }
@@ -39,7 +39,7 @@ function uploadSFTP() {
         sheetNum = sheets.length + 1;
       }
       
-      var sheetName = "SFTP - Day " + sheetDay.toString();
+      var sheetName = "CRM - Day " + sheetDay.toString();
       var newSheet = sa.insertSheet(sheetName, sheets.length+1);
       rows.pop();
       newSheet.getRange(1, 1, rows.length, rows[0].length).setValues(rows);
