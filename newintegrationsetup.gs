@@ -85,6 +85,10 @@ function schoolSetup() {
         copyFile(school, schoolfolder, MimeType.GOOGLE_DOCS, "Credential Information", templatefolder, headerValues);
         copyFile(school, schoolfolder, MimeType.GOOGLE_SHEETS, "Integration Checklists", templatefolder, headerValues);
         copyFile(school, schoolfolder, MimeType.GOOGLE_SHEETS, "Live Monitoring", templatefolder, headerValues);
+        if(school[headerValues['CRM']] == "TargetX") {
+          copyFilePlain(school, schoolfolder, MimeType.CSV, "FR_to_TargetX.csv", templatefolder, headerValues);
+          copyFilePlain(school, schoolfolder, MimeType.CSV, "targetx_to_fr.csv", templatefolder, headerValues);
+        }
         createSupport(school, schoolfolder, templatefolder, headerValues, schoolContacts);
         moveAgreement(school, schoolfolder, headerValues);
         moveFolder(schoolfolder, integrationfolder);
@@ -193,6 +197,18 @@ function copyFile(school, newFolder, fileType, fileName, templateFolder, headerV
   }
   
   var fileCopy = foundFile.makeCopy(school[headerValues['school']] + " " + foundFile.getName(), newFolder);  
+}
+
+function copyFilePlain(school, newFolder, fileType, fileName, templateFolder, headerValues) {
+  var files = templateFolder.getFilesByType(fileType);
+  while(files.hasNext()) {
+    var file = files.next();
+    if(file.getName() == fileName) {
+      var foundFile = file;
+    }
+  }
+  
+  var fileCopy = foundFile.makeCopy(foundFile.getName(), newFolder);
 }
 
 function getKickoff(school, newFolder, templatefolder, headerValues) {
